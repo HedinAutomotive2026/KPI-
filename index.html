@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="KPI Report">
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-title" content="KPI Report">
+<title>KPI Report — Michalík Juraj</title>
+
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #273348;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f1f5f9;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --accent: #3b82f6;
+    --accent-dim: rgba(59,130,246,0.15);
+    --green: #10b981;
+    --green-dim: rgba(16,185,129,0.15);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.15);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-xs: 6px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+
+  /* ── Layout ── */
+  .app {
+    display: flex;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Sidebar (PC) */
+  .sidebar {
+    width: 240px;
+    min-height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 100;
+    padding-top: var(--safe-top);
+  }
+
+  .sidebar-header {
+    padding: 24px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+
+  .logo-text { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.2; }
+  .logo-sub { font-size: 11px; color: var(--text3); }
+
+  .sidebar-meta { font-size: 12px; color: var(--text3); line-height: 1.6; }
+  .sidebar-meta strong { color: var(--text2); font-weight: 500; }
+
+  .sidebar-nav { padding: 12px 10px; flex: 1; }
+  .nav-label { font-size: 10px; font-weight: 600; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; padding: 0 10px; margin: 8px 0 4px; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px; color: var(--text2);
+    border: none; background: none; width: 100%; text-align: left;
+    transition: background 0.15s, color 0.15s;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent-dim); color: var(--accent); }
+  .nav-item .ni-icon { font-size: 16px; width: 20px; text-align: center; }
+  .nav-item .ni-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: auto; display: none; }
+  .nav-item.has-data .ni-dot { display: block; }
+
+  .sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    padding-bottom: calc(16px + var(--safe-bottom));
+  }
+  .validity-badge {
+    font-size: 11px; color: var(--text3);
+    background: var(--surface2); border-radius: var(--radius-xs);
+    padding: 6px 10px; line-height: 1.5;
+  }
+  .validity-badge span { color: var(--accent); font-weight: 500; }
+
+  /* Main content */
+  .main {
+    margin-left: 240px;
+    flex: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .topbar {
+    height: 60px;
+    display: flex; align-items: center;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 50;
+    gap: 12px;
+    padding-top: var(--safe-top);
+    height: calc(60px + var(--safe-top));
+  }
+
+  .topbar-title { font-size: 16px; font-weight: 600; flex: 1; }
+  .topbar-subtitle { font-size: 13px; color: var(--text3); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--surface2); color: var(--text);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface); border-color: var(--border2); }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #2563eb; }
+  .btn.danger { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+  .btn.sm { padding: 5px 12px; font-size: 12px; }
+
+  .content { padding: 28px; flex: 1; max-width: 1100px; }
+
+  /* ── Views ── */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* Dashboard */
+  .kpi-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .kpi-card .kc-label { font-size: 11px; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .kpi-card .kc-val { font-size: 26px; font-weight: 600; color: var(--text); line-height: 1; }
+  .kpi-card .kc-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+  .kpi-card.accent { border-color: var(--accent); background: var(--accent-dim); }
+  .kpi-card.accent .kc-val { color: var(--accent); }
+  .kpi-card.green { border-color: var(--green); background: var(--green-dim); }
+  .kpi-card.green .kc-val { color: var(--green); }
+
+  .section-head { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .chart-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 28px;
+  }
+  .chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .chart-title { font-size: 14px; font-weight: 600; }
+  .chart-legend { display: flex; gap: 16px; font-size: 12px; color: var(--text2); }
+  .chart-legend span { display: flex; align-items: center; gap: 5px; }
+  .leg-dot { width: 8px; height: 8px; border-radius: 2px; }
+  .chart-canvas-wrap { position: relative; width: 100%; height: 220px; }
+
+  /* Month table */
+  .month-view-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+  }
+
+  .kpi-form-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .kpi-form-table th {
+    background: var(--surface);
+    color: var(--text3);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+  }
+  .kpi-form-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .kpi-form-table tr:last-child td { border-bottom: none; }
+  .kpi-form-table tbody tr:hover td { background: var(--surface2); }
+
+  .kpi-name { font-weight: 500; color: var(--text); }
+  .kpi-target { font-size: 12px; color: var(--text3); }
+
+  .num-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    color: var(--text);
+    font-size: 13px;
+    padding: 6px 10px;
+    width: 100px;
+    text-align: right;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  .num-input:focus { border-color: var(--accent); }
+
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 12px; font-weight: 500;
+  }
+  .status-badge.yes { background: var(--green-dim); color: var(--green); }
+  .status-badge.no { background: var(--red-dim); color: var(--red); }
+  .status-badge.na { background: var(--surface2); color: var(--text3); }
+
+  .bool-toggle { display: flex; gap: 6px; }
+  .bool-btn {
+    padding: 5px 14px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text2);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .bool-btn:hover { border-color: var(--border2); background: var(--surface2); }
+  .bool-btn.yes-active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .bool-btn.no-active { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+
+  .reward-cell { text-align: right; font-weight: 600; font-size: 13px; }
+  .reward-cell.earned { color: var(--green); }
+  .reward-cell.zero { color: var(--text3); }
+
+  /* BEI section */
+  .bei-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-top: 20px;
+  }
+  .bei-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .bei-field { flex: 1; min-width: 200px; }
+  .bei-field label { font-size: 12px; color: var(--text3); display: block; margin-bottom: 6px; }
+  .bei-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    color: var(--text);
+    font-size: 15px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  .bei-input:focus { border-color: var(--accent); }
+  .bei-stat { text-align: center; }
+  .bei-stat .bs-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+  .bei-stat .bs-val { font-size: 22px; font-weight: 600; }
+
+  .month-total-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    margin-top: 16px;
+  }
+  .mtb-label { font-size: 13px; color: var(--text2); }
+  .mtb-val { font-size: 24px; font-weight: 700; color: var(--accent); }
+
+  .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+
+  /* BEI reference table */
+  .ref-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ref-table th {
+    background: var(--surface2);
+    color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 10px 16px; border-bottom: 1px solid var(--border); text-align: left;
+  }
+  .ref-table td { padding: 11px 16px; border-bottom: 1px solid var(--border); }
+  .ref-table tr.plan-row td { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+  .ref-table tr.bad-row td { color: var(--red); }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: calc(24px + var(--safe-bottom)); right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--green);
+    color: var(--green);
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    font-size: 13px; font-weight: 500;
+    z-index: 9999;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.25s;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ── Mobile bottom nav ── */
+  .mobile-nav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding-bottom: var(--safe-bottom);
+    z-index: 200;
+    flex-direction: row;
+  }
+  .mob-nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    padding: 8px 4px 4px;
+    cursor: pointer; border: none; background: none; color: var(--text3);
+    font-size: 10px; gap: 3px; transition: color 0.15s;
+    position: relative;
+  }
+  .mob-nav-item .mni-icon { font-size: 20px; }
+  .mob-nav-item.active { color: var(--accent); }
+  .mob-nav-item .mob-dot {
+    position: absolute; top: 6px; right: calc(50% - 14px);
+    width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+    display: none;
+  }
+  .mob-nav-item.has-data .mob-dot { display: block; }
+
+  /* Mobile header */
+  .mob-header {
+    display: none;
+    position: fixed; top: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    z-index: 150;
+    padding: var(--safe-top) 0 0;
+  }
+  .mob-header-inner {
+    display: flex; align-items: center; padding: 12px 16px;
+    gap: 12px;
+  }
+  .mob-logo { width: 30px; height: 30px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .mob-title { font-size: 14px; font-weight: 600; flex: 1; }
+  .mob-sub { font-size: 11px; color: var(--text3); }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .topbar { display: none; }
+    .mobile-nav { display: flex; }
+    .mob-header { display: block; }
+    .main {
+      margin-left: 0;
+      padding-top: calc(56px + var(--safe-top));
+      padding-bottom: calc(60px + var(--safe-bottom));
+    }
+    .content { padding: 16px; }
+    .kpi-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .kpi-form-table { font-size: 12px; }
+    .kpi-form-table th, .kpi-form-table td { padding: 8px 10px; }
+    .num-input { width: 80px; }
+    .chart-canvas-wrap { height: 180px; }
+    .bei-row { flex-direction: column; gap: 12px; }
+    .form-actions { flex-direction: column; }
+    .form-actions .btn { width: 100%; justify-content: center; }
+    .mtb-val { font-size: 20px; }
+  }
+
+  @media (min-width: 769px) {
+    .mob-header { display: none; }
+  }
+
+  /* Progress ring mini */
+  .prog-ring { display: inline-block; vertical-align: middle; }
+
+  /* Month selector mobile */
+  .month-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .month-pill {
+    padding: 5px 14px; border-radius: 100px;
+    border: 1px solid var(--border2); background: transparent;
+    color: var(--text2); font-size: 12px; cursor: pointer;
+    transition: all 0.15s; position: relative;
+  }
+  .month-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .month-pill.has-data::after { content: ''; position: absolute; top: 3px; right: 3px; width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+</style>
+</head>
+<body>
+
+<!-- Mobile header -->
+<div class="mob-header">
+  <div class="mob-header-inner">
+    <div class="mob-logo">K</div>
+    <div>
+      <div class="mob-title">KPI Report</div>
+      <div class="mob-sub">Michalík Juraj · <span id="mob-ts">2026</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="logo-mark">K</div>
+        <div>
+          <div class="logo-text">KPI Report</div>
+          <div class="logo-sub">Model odmeňovania</div>
+        </div>
+      </div>
+      <div class="sidebar-meta">
+        <strong>Michalík Juraj</strong><br>
+        Manažér servisu<br>
+        Stredisko 011, 012, 411, 412
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-label">Prehľad</div>
+      <button class="nav-item active" data-view="dashboard" onclick="showView('dashboard')">
+        <span class="ni-icon">📊</span> Dashboard
+      </button>
+      <button class="nav-item" data-view="bei" onclick="showView('bei')">
+        <span class="ni-icon">📈</span> BEI stupnica
+      </button>
+
+      <div class="nav-label" style="margin-top:12px">Mesiace</div>
+      <button class="nav-item" id="sb-jul" data-view="month-0" onclick="showMonthView(0)">
+        <span class="ni-icon">📅</span> Júl 2026
+        <span class="ni-dot"></span>
+      </button>
+      <button class="nav-item" id="sb-aug" data-view="month-1" onclick="showMonthView(1)">
+        <span class="ni-icon">📅</span> August 2026
+        <span class="ni-dot"></span>
+      </button>
+      <button class="nav-item" id="sb-sep" data-view="month-2" onclick="showMonthView(2)">
+        <span class="ni-icon">📅</span> September 2026
+        <span class="ni-dot"></span>
+      </button>
+      <button class="nav-item" id="sb-okt" data-view="month-3" onclick="showMonthView(3)">
+        <span class="ni-icon">📅</span> Október 2026
+        <span class="ni-dot"></span>
+      </button>
+      <button class="nav-item" id="sb-nov" data-view="month-4" onclick="showMonthView(4)">
+        <span class="ni-icon">📅</span> November 2026
+        <span class="ni-dot"></span>
+      </button>
+      <button class="nav-item" id="sb-dec" data-view="month-5" onclick="showMonthView(5)">
+        <span class="ni-icon">📅</span> December 2026
+        <span class="ni-dot"></span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="validity-badge">
+        Platnosť<br>
+        <span>1.7.2026 – 31.12.2026</span><br>
+        Základný plat: <span>2 500 €</span><br>
+        Cieľová odmena: <span>1 500 €</span>
+      </div>
+      <div id="last-saved-sidebar" style="margin-top:10px;font-size:11px;color:var(--text3);line-height:1.5;display:none;">
+        Posledná aktualizácia<br>
+        <span id="last-saved-dt" style="color:var(--accent)"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div style="flex:1"></div>
+      <div id="topbar-ts" style="font-size:11px;color:var(--text3);text-align:right;display:none;line-height:1.4;">
+        Posledná aktualizácia<br>
+        <span id="topbar-ts-val" style="color:var(--accent)"></span>
+      </div>
+      <div class="topbar-subtitle" id="topbar-sub">Júl – December 2026</div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD VIEW -->
+      <div class="view active" id="view-dashboard">
+        <div class="kpi-cards">
+          <div class="kpi-card">
+            <div class="kc-label">Mesiace zadané</div>
+            <div class="kc-val" id="d-months">0 / 6</div>
+            <div class="kc-sub">zo 6 mesiacov</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kc-label">BEI kumulatív</div>
+            <div class="kc-val" id="d-bei-cumul">—</div>
+            <div class="kc-sub" id="d-bei-cumul-sub">súčet zadaných mesiacov</div>
+          </div>
+          <div class="kpi-card" id="d-bei-pct-card">
+            <div class="kc-label">BEI plnenie cieľa</div>
+            <div class="kc-val" id="d-bei-pct">—</div>
+            <div class="kc-sub" id="d-bei-pct-sub">voči 100% plánu</div>
+          </div>
+          <div class="kpi-card accent">
+            <div class="kc-label">Odhadovaná cieľová odmena</div>
+            <div class="kc-val" id="d-odmena">—</div>
+            <div class="kc-sub" id="d-odmena-sub">za zadané mesiace</div>
+          </div>
+          <div class="kpi-card green">
+            <div class="kc-label">Celková odh. mzda (6M)</div>
+            <div class="kc-val" id="d-total">—</div>
+            <div class="kc-sub">vrátane základu</div>
+          </div>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-head">
+            <div class="chart-title">Plnenie BEI — mesačný cieľ vs. skutočnosť</div>
+            <div style="font-size:11px;color:var(--text3)">Čiara = mesačný cieľ 100% (192 162 €)</div>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="beiTrackChart" role="img" aria-label="Graf plnenia BEI cieľa po mesiacoch">Mesačné plnenie BEI cieľa.</canvas>
+          </div>
+          <!-- BEI mesačné stats -->
+          <div id="bei-monthly-stats" style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:14px;"></div>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-head">
+            <div class="chart-title">Mesačné odmeny (KPI + BEI)</div>
+            <div class="chart-legend">
+              <span><span class="leg-dot" style="background:#3b82f6"></span>KPI</span>
+              <span><span class="leg-dot" style="background:#10b981"></span>BEI</span>
+            </div>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="mainChart" role="img" aria-label="Stĺpcový graf mesačných odmien júl–december 2026">Mesačný vývoj KPI a BEI odmien.</canvas>
+          </div>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-head">
+            <div class="chart-title">Plnenie KPI cieľov — prehľad</div>
+          </div>
+          <div id="kpi-overview-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;"></div>
+        </div>
+      </div>
+
+      <!-- MONTH VIEW (rendered dynamically) -->
+      <div class="view" id="view-month">
+        <div class="month-pills" id="month-pills"></div>
+
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:0;">
+          <table class="kpi-form-table">
+            <thead>
+              <tr>
+                <th style="width:40%">KPI ukazovateľ a úrovne odmien</th>
+                <th style="width:90px">Výsledok</th>
+                <th>Status</th>
+                <th style="text-align:right">Odmena</th>
+              </tr>
+            </thead>
+            <tbody id="kpi-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="bei-box">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+            <div class="section-head" style="margin:0">BEI — hrubý zisk stredísk</div>
+            <div style="font-size:11px;color:var(--text3);">
+              Mesačný cieľ 100%: <strong style="color:var(--accent)" id="bei-monthly-target-lbl"></strong>
+            </div>
+          </div>
+
+          <!-- Progress bar mesačného plnenia -->
+          <div id="bei-progress-wrap" style="margin-bottom:16px;display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span style="font-size:12px;color:var(--text2);">Plnenie mesačného cieľa</span>
+              <span id="bei-pct-lbl" style="font-size:13px;font-weight:700;"></span>
+            </div>
+            <div style="height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative;">
+              <div id="bei-progress-fill" style="height:100%;border-radius:5px;transition:width 0.4s,background 0.3s;width:0%"></div>
+              <!-- značky 80%, 100%, 115% -->
+              <div style="position:absolute;top:0;bottom:0;left:calc(922378/1152972*100%*1/1.15);width:1px;background:rgba(255,255,255,0.2)" title="80%"></div>
+              <div style="position:absolute;top:0;bottom:0;left:calc(100% * 1011085/1152972 / 1.15 );width:1px;background:rgba(255,255,255,0.2)" title="LY"></div>
+            </div>
+            <!-- Milestone labels -->
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;" id="bei-milestones"></div>
+          </div>
+
+          <div class="bei-row">
+            <div class="bei-field">
+              <label>Hrubý zisk za mesiac (EUR)</label>
+              <input type="number" class="bei-input" id="bei-input" placeholder="Zadajte sumu v €..." oninput="updateBei()" />
+            </div>
+            <div class="bei-stat">
+              <div class="bs-label">Status</div>
+              <div class="bs-val" id="bei-status-lbl" style="font-size:14px;font-weight:600;color:var(--text3)">—</div>
+            </div>
+            <div class="bei-stat">
+              <div class="bs-label">Odmena zo zisku</div>
+              <div class="bs-val" id="bei-reward" style="color:var(--accent)">—</div>
+            </div>
+            <div class="bei-stat">
+              <div class="bs-label">Spolu za mesiac</div>
+              <div class="bs-val" id="month-total-sm" style="color:var(--green)">—</div>
+            </div>
+          </div>
+
+          <!-- Kumulatívny súčet BEI -->
+          <div id="bei-cumul-wrap" style="margin-top:14px;padding:10px 14px;background:var(--surface2);border-radius:var(--radius-sm);display:none;">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Kumulatívny stav BEI (všetky zadané mesiace)</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+              <div><div style="font-size:10px;color:var(--text3)">Súčet dosiahnutý</div><div id="bei-cumul-actual" style="font-size:16px;font-weight:700;color:var(--text)">—</div></div>
+              <div><div style="font-size:10px;color:var(--text3)">Cieľ na zadané mes.</div><div id="bei-cumul-target" style="font-size:16px;font-weight:700;color:var(--text2)">—</div></div>
+              <div><div style="font-size:10px;color:var(--text3)">Plnenie</div><div id="bei-cumul-pct" style="font-size:16px;font-weight:700;">—</div></div>
+              <div><div style="font-size:10px;color:var(--text3)">Zostatok do konca roka</div><div id="bei-cumul-remain" style="font-size:16px;font-weight:700;color:var(--text2)">—</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="month-total-bar" id="month-total-bar">
+          <div>
+            <div class="mtb-label" id="mtb-month-name">Celková odmena — mesiac</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">KPI odmena + BEI odmena</div>
+          </div>
+          <div class="mtb-val" id="month-total-val">0 €</div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn danger sm" onclick="clearMonth()">🗑 Vymazať mesiac</button>
+          <button class="btn primary" onclick="saveMonth()">✓ Uložiť výsledky</button>
+        </div>
+      </div>
+
+      <!-- BEI VIEW -->
+      <div class="view" id="view-bei">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px;">
+          <table class="ref-table">
+            <thead>
+              <tr>
+                <th>% plnenia</th>
+                <th>EUR (hrubý zisk)</th>
+                <th style="text-align:right">Odmena zo zisku</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="bad-row">
+                <td>Pod 80%</td>
+                <td>pod 922 378 €</td>
+                <td style="text-align:right;font-weight:600">0 € – bez prémie</td>
+              </tr>
+              <tr>
+                <td>80%</td>
+                <td>922 378 €</td>
+                <td style="text-align:right">7 298 €</td>
+              </tr>
+              <tr>
+                <td>LY výsledok</td>
+                <td>1 011 085 €</td>
+                <td style="text-align:right">8 000 €</td>
+              </tr>
+              <tr class="plan-row">
+                <td>100% plán ★</td>
+                <td>1 152 972 €</td>
+                <td style="text-align:right">9 000 €</td>
+              </tr>
+              <tr>
+                <td>105%</td>
+                <td>1 210 621 €</td>
+                <td style="text-align:right">9 900 €</td>
+              </tr>
+              <tr>
+                <td>110%</td>
+                <td>1 268 269 €</td>
+                <td style="text-align:right">10 800 €</td>
+              </tr>
+              <tr>
+                <td>115%</td>
+                <td>1 325 918 €</td>
+                <td style="text-align:right">11 700 €</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px;">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;font-size:11px;">Ročné cieľové odmeny (vyplácané 1× ročne po FY)</div>
+          <table class="ref-table">
+            <thead>
+              <tr><th>KPI ukazovateľ</th><th style="text-align:right">Max odmena</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Stafino – spokojnosť zákazníkov ≥85%</td><td style="text-align:right">2 000 €</td></tr>
+              <tr><td>GDPR ≥75%</td><td style="text-align:right">1 500 €</td></tr>
+              <tr><td>Produktivita práce ≥85%</td><td style="text-align:right">2 000 €</td></tr>
+              <tr><td>DSD book &gt;50%</td><td style="text-align:right">1 250 €</td></tr>
+              <tr><td>DSD tab &gt;60%</td><td style="text-align:right">1 250 €</td></tr>
+              <tr><td>Tabletový príjem s el. podpisom ≥30%</td><td style="text-align:right">1 250 €</td></tr>
+              <tr><td>Rozpracovaná výroba 0 SO nad 45 dní</td><td style="text-align:right">1 250 €</td></tr>
+              <tr><td>Nulové pohľadávky po splatnosti servisu</td><td style="text-align:right">1 000 €</td></tr>
+              <tr><td>Predaj PETROMARK aditíva min 35% BSZV PKW</td><td style="text-align:right">2 000 €</td></tr>
+              <tr style="background:var(--accent-dim)"><td><strong>Celkom KPI max</strong></td><td style="text-align:right;color:var(--accent);font-weight:700">14 000 €</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-head">
+            <div class="chart-title">BEI odmena v závislosti od obratu</div>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="beiChart" role="img" aria-label="Graf závislosti BEI odmeny od hrubého zisku">BEI odmena podľa výšky hrubého zisku.</canvas>
+          </div>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:var(--radius);padding:16px;font-size:12px;color:var(--text3);line-height:1.7;">
+          <strong style="color:var(--text2)">Podmienky vyplácania:</strong><br>
+          • Mesačná odmena 1× mesačne.<br>
+          • Cieľová odmena 1× ročne po ukončení FY, spravidla do konca Q1.<br>
+          • Odmena zo zisku sa prepočíta po ukončení FY podľa aktuálnych výsledkov.<br>
+          • Pod 80% BEI bez prémie.<br>
+          • Zamestnanec musí byť v čase vyplácania v trvalom pracovnom pomere.
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- Mobile bottom nav -->
+<nav class="mobile-nav">
+  <button class="mob-nav-item active" data-view="dashboard" onclick="showView('dashboard')">
+    <span class="mni-icon">📊</span>
+    <span>Prehľad</span>
+  </button>
+  <button class="mob-nav-item" id="mob-nav-month" data-view="month" onclick="showMobileMonth()">
+    <span class="mni-icon">📅</span>
+    <span>Mesiac</span>
+    <span class="mob-dot"></span>
+  </button>
+  <button class="mob-nav-item" data-view="bei" onclick="showView('bei')">
+    <span class="mni-icon">📈</span>
+    <span>BEI</span>
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const MONTHS = ['Júl','August','September','Október','November','December'];
+const MONTHS_SHORT = ['Júl','Aug','Sep','Okt','Nov','Dec'];
+
+// KPI definície so stupňovanými odmenami podľa Excel tabuľky (Model_KPI_odmeňovania_2026.xlsx)
+// type:'pct' = percentuálny vstup | type:'bool' = áno/nie
+// tiers sú zoradené od najvyššieho — prvý tier kde result >= min sa použije
+const KPI_DEFS = [
+  {
+    id:'stafino', label:'Stafino – spokojnosť zákazníkov', type:'pct',
+    targetLabel:'80% = 500 €  |  85% = 1 000 €  |  87% = 2 000 €',
+    tiers:[{min:87,reward:2000},{min:85,reward:1000},{min:80,reward:500}],
+  },
+  {
+    id:'gdpr', label:'GDPR', type:'pct',
+    targetLabel:'75% = 500 €  |  80% = 1 500 €',
+    tiers:[{min:80,reward:1500},{min:75,reward:500}],
+  },
+  {
+    id:'produktiv', label:'Produktivita práce', type:'pct',
+    targetLabel:'80% = 500 €  |  85% = 1 500 €  |  87% = 2 000 €',
+    tiers:[{min:87,reward:2000},{min:85,reward:1500},{min:80,reward:500}],
+  },
+  {
+    id:'dsd_book', label:'DSD book viac ako 50%', type:'pct',
+    targetLabel:'> 50% = 1 250 €',
+    tiers:[{min:50,reward:1250}],
+  },
+  {
+    id:'dsd_tab', label:'DSD tab viac ako 60%', type:'pct',
+    targetLabel:'> 60% = 1 250 €',
+    tiers:[{min:60,reward:1250}],
+  },
+  {
+    id:'tablet', label:'Tabletový príjem s el. podpisom', type:'pct',
+    targetLabel:'≥ 30% = 1 250 €',
+    tiers:[{min:30,reward:1250}],
+  },
+  {
+    id:'rozprac', label:'Rozpracovaná výroba 0 SO nad 45 dní', type:'bool',
+    targetLabel:'Splnené = 1 250 €',
+    tiers:[{min:1,reward:1250}],
+  },
+  {
+    id:'pohladavky', label:'Nulové pohľadávky po splatnosti servisu', type:'bool',
+    targetLabel:'Splnené = 1 000 €',
+    tiers:[{min:1,reward:1000}],
+  },
+  {
+    id:'petromark', label:'Predaj PETROMARK aditíva z BSZV PKW', type:'pct',
+    targetLabel:'20%=500€  |  25%=750€  |  30%=1 000€  |  35%=2 000€',
+    tiers:[{min:35,reward:2000},{min:30,reward:1000},{min:25,reward:750},{min:20,reward:500}],
+  },
+];
+
+const MAX_KPI = 14000; // max mesačná KPI odmena
+const BASE = 2500; // základná mzda
+
+function getKpiRewardForValue(kpi, val) {
+  if (kpi.type === 'bool') {
+    return val === true ? kpi.tiers[0].reward : 0;
+  }
+  const n = parseFloat(val);
+  if (isNaN(n) || val === '') return 0;
+  // nájdi najvyšší tier kde n >= min
+  for (const t of kpi.tiers) {
+    if (n >= t.min) return t.reward;
+  }
+  return 0;
+}
+
+function getKpiTopReward(kpi) {
+  return kpi.tiers[0].reward;
+}
+
+let monthData = loadData();
+let activeMonth = 0;
+let mainChart = null, beiChart = null;
+let currentView = 'dashboard';
+
+function loadData() {
+  try {
+    const s = localStorage.getItem('kpi_2026');
+    if (s) return JSON.parse(s);
+  } catch(e) {}
+  return Array(6).fill(null).map(() => ({ kpi:{}, bei:'', saved:false }));
+}
+
+function loadLastSaved() {
+  try { return localStorage.getItem('kpi_2026_ts') || null; } catch(e) { return null; }
+}
+
+function saveData() {
+  try {
+    localStorage.setItem('kpi_2026', JSON.stringify(monthData));
+    const now = new Date();
+    const ts = now.toLocaleString('sk-SK', {
+      day:'2-digit', month:'2-digit', year:'numeric',
+      hour:'2-digit', minute:'2-digit', second:'2-digit'
+    });
+    localStorage.setItem('kpi_2026_ts', ts);
+    renderTimestamp(ts);
+  } catch(e) {}
+}
+
+function renderTimestamp(ts) {
+  if (!ts) return;
+  // Sidebar
+  const sideEl = document.getElementById('last-saved-sidebar');
+  const sideDt = document.getElementById('last-saved-dt');
+  if (sideEl && sideDt) { sideEl.style.display = 'block'; sideDt.textContent = ts; }
+  // Topbar
+  const tbEl = document.getElementById('topbar-ts');
+  const tbVal = document.getElementById('topbar-ts-val');
+  if (tbEl && tbVal) { tbEl.style.display = 'block'; tbVal.textContent = ts; }
+  // Mobile
+  const mobTs = document.getElementById('mob-ts');
+  if (mobTs) mobTs.textContent = 'uložené ' + ts;
+}
+
+function getBeiReward(eur) {
+  if (!eur || eur < 922378) return 0;
+  if (eur < 1011085) return Math.round(7298 + (eur-922378)/(1011085-922378)*(8000-7298));
+  if (eur < 1152972) return Math.round(8000 + (eur-1011085)/(1152972-1011085)*(9000-8000));
+  if (eur < 1210621) return Math.round(9000 + (eur-1152972)/(1210621-1152972)*(9900-9000));
+  if (eur < 1268269) return Math.round(9900 + (eur-1210621)/(1268269-1210621)*(10800-9900));
+  if (eur < 1325918) return Math.round(10800 + (eur-1268269)/(1325918-1268269)*(11700-10800));
+  return 11700;
+}
+
+// ── BEI mesačné ciele (ročné hodnoty / 6 mesiacov) ──
+const BEI_ANNUAL = {
+  plan80:   922378,   // 80% ročne → /6 mesiacov
+  planLY:   1011085,
+  plan100:  1152972,  // 100% cieľ ročne
+  plan105:  1210621,
+  plan110:  1268269,
+  plan115:  1325918,
+};
+const BEI_MONTHLY = {
+  plan80:   Math.round(BEI_ANNUAL.plan80  / 6),   // 153 730 €
+  planLY:   Math.round(BEI_ANNUAL.planLY  / 6),   // 168 514 €
+  plan100:  Math.round(BEI_ANNUAL.plan100 / 6),   // 192 162 €
+  plan105:  Math.round(BEI_ANNUAL.plan105 / 6),
+  plan110:  Math.round(BEI_ANNUAL.plan110 / 6),
+  plan115:  Math.round(BEI_ANNUAL.plan115 / 6),
+};
+
+function getMonthBeiPct(eur) {
+  // Vráti % plnenia mesačného 100% cieľa
+  if (!eur) return 0;
+  return Math.round(eur / BEI_MONTHLY.plan100 * 100);
+}
+
+function getMonthBeiStatus(eur) {
+  if (!eur || eur < BEI_MONTHLY.plan80) return { label:'Pod 80%', color:'#ef4444', pct: Math.round(eur/BEI_MONTHLY.plan80*100) };
+  if (eur < BEI_MONTHLY.planLY)  return { label:'80 – LY', color:'#f59e0b', pct: getMonthBeiPct(eur) };
+  if (eur < BEI_MONTHLY.plan100) return { label:'LY – 100%', color:'#f59e0b', pct: getMonthBeiPct(eur) };
+  if (eur < BEI_MONTHLY.plan105) return { label:'100% ✓', color:'#10b981', pct: getMonthBeiPct(eur) };
+  if (eur < BEI_MONTHLY.plan110) return { label:'105% ✓', color:'#10b981', pct: getMonthBeiPct(eur) };
+  if (eur < BEI_MONTHLY.plan115) return { label:'110% ✓', color:'#10b981', pct: getMonthBeiPct(eur) };
+  return { label:'115%+ ✓', color:'#10b981', pct: getMonthBeiPct(eur) };
+}
+
+function getMonthKpiReward(m) {
+  let total = 0;
+  KPI_DEFS.forEach(k => {
+    const v = monthData[m].kpi[k.id] || {};
+    const val = k.type === 'bool' ? v.met : v.result;
+    total += getKpiRewardForValue(k, val);
+  });
+  return Math.min(total, MAX_KPI);
+}
+
+function getMonthBeiReward(m) {
+  const v = parseFloat(monthData[m].bei) || 0;
+  return getBeiReward(v);
+}
+
+function fmt(n) { return n.toLocaleString('sk') + ' €'; }
+
+// ── Views ──
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.mob-nav-item').forEach(n => n.classList.remove('active'));
+
+  currentView = name;
+
+  if (name === 'dashboard') {
+    document.getElementById('view-dashboard').classList.add('active');
+    document.querySelector('[data-view="dashboard"]').classList.add('active');
+    document.getElementById('topbar-title').textContent = 'Dashboard';
+    document.getElementById('topbar-sub').textContent = 'Júl – December 2026';
+    updateDashboard();
+  } else if (name === 'bei') {
+    document.getElementById('view-bei').classList.add('active');
+    document.querySelector('.nav-item[data-view="bei"]').classList.add('active');
+    document.querySelector('.mob-nav-item[data-view="bei"]').classList.add('active');
+    document.getElementById('topbar-title').textContent = 'BEI stupnica';
+    document.getElementById('topbar-sub').textContent = 'Odmena zo zisku';
+    setTimeout(renderBeiChart, 50);
+  }
+}
+
+function showMonthView(m) {
+  activeMonth = m;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.mob-nav-item').forEach(n => n.classList.remove('active'));
+
+  currentView = 'month';
+  document.getElementById('view-month').classList.add('active');
+  const sbKeys = ['sb-jul','sb-aug','sb-sep','sb-okt','sb-nov','sb-dec'];
+  document.getElementById(sbKeys[m]).classList.add('active');
+  const mobBtn = document.getElementById('mob-nav-month');
+  if (mobBtn) mobBtn.classList.add('active');
+
+  document.getElementById('topbar-title').textContent = MONTHS[m] + ' 2026';
+  document.getElementById('topbar-sub').textContent = 'Zadávanie výsledkov';
+  document.getElementById('mtb-month-name').textContent = 'Celková odmena — ' + MONTHS[m];
+
+  renderMonthPills();
+  renderKpiTable();
+}
+
+function showMobileMonth() {
+  showMonthView(activeMonth);
+}
+
+// ── Month pills ──
+function renderMonthPills() {
+  const c = document.getElementById('month-pills');
+  c.innerHTML = '';
+  MONTHS_SHORT.forEach((m, i) => {
+    const b = document.createElement('button');
+    b.className = 'month-pill' + (i === activeMonth ? ' active' : '') + (monthData[i].saved ? ' has-data' : '');
+    b.textContent = m;
+    b.onclick = () => { activeMonth = i; showMonthView(i); };
+    c.appendChild(b);
+  });
+}
+
+// ── KPI Table ──
+function renderKpiTable() {
+  const tbody = document.getElementById('kpi-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const data = monthData[activeMonth];
+
+  KPI_DEFS.forEach(kpi => {
+    const v = data.kpi[kpi.id] || {};
+    const tr = document.createElement('tr');
+    let resultHtml = '', statusHtml = '', rewardHtml = '';
+
+    if (kpi.type === 'pct') {
+      const cur = v.result !== undefined ? v.result : '';
+      const rew = getKpiRewardForValue(kpi, cur);
+      const isMet = rew > 0;
+
+      // Tier badges
+      const tierBadges = kpi.tiers.map(t => {
+        const active = parseFloat(cur) >= t.min;
+        const isTop = t === kpi.tiers[0];
+        return `<span style="display:inline-block;font-size:10px;padding:1px 7px;border-radius:100px;margin-right:3px;
+          background:${active ? (isTop?'rgba(16,185,129,0.2)':'rgba(59,130,246,0.2)') : 'rgba(255,255,255,0.04)'};
+          color:${active ? (isTop?'#10b981':'#3b82f6') : '#4b5563'};
+          border:1px solid ${active ? (isTop?'rgba(16,185,129,0.4)':'rgba(59,130,246,0.3)') : 'rgba(255,255,255,0.06)'}">
+          ≥${t.min}% → ${t.reward.toLocaleString('sk')}€</span>`;
+      }).join('');
+
+      resultHtml = `<input type="number" class="num-input" min="0" max="200" step="0.1" value="${cur}" placeholder="%"
+        oninput="setKpiVal('${kpi.id}','result',this.value)" />`;
+
+      if (cur === '') {
+        statusHtml = '<span class="status-badge na">—</span>';
+      } else if (isMet) {
+        statusHtml = `<span class="status-badge yes">✓ ${rew.toLocaleString('sk')} €</span>`;
+      } else {
+        statusHtml = '<span class="status-badge no">✗ Nesplnené</span>';
+      }
+      rewardHtml = `<div class="reward-cell ${isMet?'earned':'zero'}" style="font-size:12px">
+        ${isMet ? `<strong>${fmt(rew)}</strong>` : '0 €'}
+        <div style="margin-top:4px">${tierBadges}</div>
+      </div>`;
+
+    } else {
+      // bool
+      const cur = v.met;
+      const rew = getKpiRewardForValue(kpi, cur);
+      const isMet = cur === true;
+      resultHtml = `<div class="bool-toggle">
+        <button class="bool-btn${cur===true?' yes-active':''}" onclick="setKpiBool('${kpi.id}',true)">Áno</button>
+        <button class="bool-btn${cur===false?' no-active':''}" onclick="setKpiBool('${kpi.id}',false)">Nie</button>
+      </div>`;
+      if (cur === undefined) statusHtml = '<span class="status-badge na">—</span>';
+      else if (isMet) statusHtml = `<span class="status-badge yes">✓ Splnené</span>`;
+      else statusHtml = '<span class="status-badge no">✗ Nesplnené</span>';
+      rewardHtml = `<div class="reward-cell ${isMet?'earned':'zero'}">${isMet ? fmt(rew) : '0 €'}</div>`;
+    }
+
+    tr.innerHTML = `
+      <td>
+        <div class="kpi-name">${kpi.label}</div>
+        <div class="kpi-target" style="margin-top:2px">${kpi.targetLabel}</div>
+      </td>
+      <td>${resultHtml}</td>
+      <td>${statusHtml}</td>
+      <td>${rewardHtml}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // BEI
+  const beiIn = document.getElementById('bei-input');
+  if (beiIn) beiIn.value = monthData[activeMonth].bei || '';
+  updateMonthTotals();
+}
+
+function setKpiVal(id, field, val) {
+  if (!monthData[activeMonth].kpi[id]) monthData[activeMonth].kpi[id] = {};
+  monthData[activeMonth].kpi[id][field] = val;
+  renderKpiTable();
+}
+
+function setKpiBool(id, val) {
+  if (!monthData[activeMonth].kpi[id]) monthData[activeMonth].kpi[id] = {};
+  monthData[activeMonth].kpi[id].met = val;
+  renderKpiTable();
+}
+
+function updateBei() {
+  monthData[activeMonth].bei = document.getElementById('bei-input').value;
+  updateMonthTotals();
+}
+
+function updateMonthTotals() {
+  const kpiRew = getMonthKpiReward(activeMonth);
+  const beiVal = parseFloat(document.getElementById('bei-input')?.value) || 0;
+  const beiRew = getBeiReward(beiVal);
+  const total = kpiRew + beiRew;
+
+  // Mesačný cieľ label
+  const tgtLbl = document.getElementById('bei-monthly-target-lbl');
+  if (tgtLbl) tgtLbl.textContent = fmt(BEI_MONTHLY.plan100);
+
+  // Progress bar
+  const progressWrap = document.getElementById('bei-progress-wrap');
+  const progressFill = document.getElementById('bei-progress-fill');
+  const pctLbl = document.getElementById('bei-pct-lbl');
+  const statusLbl = document.getElementById('bei-status-lbl');
+  const milestones = document.getElementById('bei-milestones');
+
+  if (beiVal > 0) {
+    if (progressWrap) progressWrap.style.display = 'block';
+    const pct = getMonthBeiPct(beiVal);
+    const status = getMonthBeiStatus(beiVal);
+    const fillPct = Math.min(pct / 115 * 100, 100); // scale to 115% max
+
+    if (progressFill) {
+      progressFill.style.width = fillPct + '%';
+      progressFill.style.background = status.color;
+    }
+    if (pctLbl) { pctLbl.textContent = pct + '%'; pctLbl.style.color = status.color; }
+    if (statusLbl) { statusLbl.textContent = status.label; statusLbl.style.color = status.color; }
+
+    // Milestone badges
+    if (milestones) {
+      const ms = [
+        { label:'80%', val: BEI_MONTHLY.plan80, color:'#f59e0b' },
+        { label:'LY',  val: BEI_MONTHLY.planLY, color:'#f59e0b' },
+        { label:'100%',val: BEI_MONTHLY.plan100, color:'#10b981' },
+        { label:'105%',val: BEI_MONTHLY.plan105, color:'#10b981' },
+        { label:'110%',val: BEI_MONTHLY.plan110, color:'#10b981' },
+        { label:'115%',val: BEI_MONTHLY.plan115, color:'#10b981' },
+      ];
+      milestones.innerHTML = ms.map(m => {
+        const reached = beiVal >= m.val;
+        return `<span style="font-size:10px;padding:2px 8px;border-radius:100px;
+          background:${reached ? m.color+'22' : 'rgba(255,255,255,0.04)'};
+          color:${reached ? m.color : '#4b5563'};
+          border:1px solid ${reached ? m.color+'55' : 'rgba(255,255,255,0.06)'}">
+          ${reached ? '✓' : '○'} ${m.label} (${(m.val/1000).toFixed(0)}k €)</span>`;
+      }).join('');
+    }
+  } else {
+    if (progressWrap) progressWrap.style.display = 'none';
+    if (statusLbl) { statusLbl.textContent = '—'; statusLbl.style.color = 'var(--text3)'; }
+    if (milestones) milestones.innerHTML = '';
+  }
+
+  // Kumulatívny BEI
+  const cumulWrap = document.getElementById('bei-cumul-wrap');
+  let cumulActual = 0, cumulMonths = 0;
+  monthData.forEach((d, i) => {
+    const v = parseFloat(d.bei) || 0;
+    if (v > 0 || i === activeMonth) {
+      const val = i === activeMonth ? beiVal : v;
+      if (val > 0) { cumulActual += val; cumulMonths++; }
+    }
+  });
+  // use live beiVal for active month
+  cumulActual = 0; cumulMonths = 0;
+  monthData.forEach((d, i) => {
+    const v = i === activeMonth ? beiVal : (parseFloat(d.bei) || 0);
+    if (v > 0) { cumulActual += v; cumulMonths++; }
+  });
+
+  if (cumulMonths > 0 && cumulWrap) {
+    cumulWrap.style.display = 'block';
+    const cumulTarget = BEI_MONTHLY.plan100 * cumulMonths;
+    const cumulPct = Math.round(cumulActual / cumulTarget * 100);
+    const remaining = BEI_ANNUAL.plan100 - cumulActual;
+    const pctColor = cumulPct >= 100 ? '#10b981' : cumulPct >= 80 ? '#f59e0b' : '#ef4444';
+    const setEl = (id, val) => { const e = document.getElementById(id); if(e) e.textContent = val; };
+    setEl('bei-cumul-actual', fmt(Math.round(cumulActual)));
+    setEl('bei-cumul-target', fmt(cumulTarget));
+    const pctEl = document.getElementById('bei-cumul-pct');
+    if (pctEl) { pctEl.textContent = cumulPct + '%'; pctEl.style.color = pctColor; }
+    setEl('bei-cumul-remain', remaining > 0 ? fmt(Math.round(remaining)) : '✓ Cieľ splnený');
+  } else if (cumulWrap) {
+    cumulWrap.style.display = 'none';
+  }
+
+  // Reward cells
+  const brEl = document.getElementById('bei-reward');
+  if (brEl) brEl.textContent = beiVal > 0 ? fmt(beiRew) : '—';
+  const mtsEl = document.getElementById('month-total-sm');
+  if (mtsEl) mtsEl.textContent = total > 0 ? fmt(total) : '—';
+  const mtvEl = document.getElementById('month-total-val');
+  if (mtvEl) mtvEl.textContent = fmt(total);
+}
+
+function saveMonth() {
+  monthData[activeMonth].saved = true;
+  saveData();
+  updateSidebarDots();
+  renderMonthPills();
+  updateDashboard();
+  showToast('✓ Výsledky za ' + MONTHS[activeMonth] + ' uložené');
+}
+
+function clearMonth() {
+  monthData[activeMonth] = { kpi:{}, bei:'', saved:false };
+  saveData();
+  updateSidebarDots();
+  renderMonthPills();
+  renderKpiTable();
+  updateDashboard();
+}
+
+function updateSidebarDots() {
+  const sbKeys = ['sb-jul','sb-aug','sb-sep','sb-okt','sb-nov','sb-dec'];
+  sbKeys.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('has-data', !!monthData[i].saved);
+  });
+}
+
+// ── Dashboard ──
+function updateDashboard() {
+  let filled = 0, kpiSum = 0, beiSum = 0, beiCumulActual = 0, beiFilledMonths = 0;
+  monthData.forEach((d, i) => {
+    const k = getMonthKpiReward(i);
+    const b = getMonthBeiReward(i);
+    if (d.saved) filled++;
+    kpiSum += k;
+    const bv = parseFloat(d.bei) || 0;
+    if (bv > 0) { beiSum += b; beiCumulActual += bv; beiFilledMonths++; }
+  });
+
+  document.getElementById('d-months').textContent = filled + ' / 6';
+
+  // BEI kumulatív
+  const beiCumulTarget = BEI_MONTHLY.plan100 * Math.max(beiFilledMonths, 1);
+  const beiCumulPct = beiFilledMonths > 0 ? Math.round(beiCumulActual / (BEI_MONTHLY.plan100 * beiFilledMonths) * 100) : 0;
+  const beiColor = beiCumulPct >= 100 ? 'green' : beiCumulPct >= 80 ? '' : '';
+
+  const cumulEl = document.getElementById('d-bei-cumul');
+  if (cumulEl) cumulEl.textContent = beiFilledMonths > 0 ? fmt(Math.round(beiCumulActual)) : '—';
+  const cumulSub = document.getElementById('d-bei-cumul-sub');
+  if (cumulSub) cumulSub.textContent = beiFilledMonths > 0 ? `cieľ: ${fmt(BEI_MONTHLY.plan100 * beiFilledMonths)}` : 'žiadne dáta';
+
+  const pctEl = document.getElementById('d-bei-pct');
+  const pctCard = document.getElementById('d-bei-pct-card');
+  if (pctEl) {
+    pctEl.textContent = beiFilledMonths > 0 ? beiCumulPct + '%' : '—';
+    pctEl.style.color = beiCumulPct >= 100 ? '#10b981' : beiCumulPct >= 80 ? '#f59e0b' : beiFilledMonths > 0 ? '#ef4444' : '';
+  }
+  const pctSub = document.getElementById('d-bei-pct-sub');
+  if (pctSub) pctSub.textContent = beiFilledMonths > 0 ? `${beiFilledMonths} mes. · zostatok: ${fmt(Math.round(Math.max(0, BEI_ANNUAL.plan100 - beiCumulActual)))}` : 'voči 100% plánu';
+
+  const totalOdm = kpiSum + beiSum;
+  document.getElementById('d-odmena').textContent = totalOdm > 0 ? fmt(totalOdm) : '—';
+  document.getElementById('d-odmena-sub').textContent = filled > 0 ? 'za ' + filled + ' mesiacov' : 'žiadne dáta';
+  const totalMzda = BASE * 6 + totalOdm;
+  document.getElementById('d-total').textContent = totalOdm > 0 ? fmt(totalMzda) : '—';
+
+  updateMainChart();
+  updateBeiTrackChart();
+  updateKpiOverview();
+  updateBeiMonthlyStats();
+}
+
+let beiTrackChart = null;
+function updateBeiTrackChart() {
+  const actual = monthData.map(d => parseFloat(d.bei) || null);
+  const target = Array(6).fill(BEI_MONTHLY.plan100);
+  const target80 = Array(6).fill(BEI_MONTHLY.plan80);
+
+  const ctx = document.getElementById('beiTrackChart');
+  if (!ctx) return;
+
+  if (!beiTrackChart) {
+    beiTrackChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: MONTHS_SHORT,
+        datasets: [
+          {
+            type: 'bar', label: 'Skutočný zisk', data: actual,
+            backgroundColor: actual.map(v => v === null ? 'rgba(100,116,139,0.2)' : v >= BEI_MONTHLY.plan100 ? 'rgba(16,185,129,0.7)' : v >= BEI_MONTHLY.plan80 ? 'rgba(245,158,11,0.7)' : 'rgba(239,68,68,0.7)'),
+            borderRadius: 5, borderSkipped: false, order: 2
+          },
+          {
+            type: 'line', label: '100% cieľ', data: target,
+            borderColor: '#3b82f6', borderWidth: 2, borderDash: [6,3],
+            pointRadius: 0, fill: false, order: 1, tension: 0
+          },
+          {
+            type: 'line', label: '80% min', data: target80,
+            borderColor: '#f59e0b', borderWidth: 1, borderDash: [3,3],
+            pointRadius: 0, fill: false, order: 1, tension: 0
+          },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 16 } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.raw !== null ? ctx.raw.toLocaleString('sk') + ' €' : 'nezadané') } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11 } } },
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', font: { size: 11 }, callback: v => (v/1000).toFixed(0) + 'k €' } }
+        }
+      }
+    });
+  } else {
+    beiTrackChart.data.datasets[0].data = actual;
+    beiTrackChart.data.datasets[0].backgroundColor = actual.map(v => v === null ? 'rgba(100,116,139,0.2)' : v >= BEI_MONTHLY.plan100 ? 'rgba(16,185,129,0.7)' : v >= BEI_MONTHLY.plan80 ? 'rgba(245,158,11,0.7)' : 'rgba(239,68,68,0.7)');
+    beiTrackChart.update();
+  }
+}
+
+function updateBeiMonthlyStats() {
+  const grid = document.getElementById('bei-monthly-stats');
+  if (!grid) return;
+  grid.innerHTML = '';
+  monthData.forEach((d, i) => {
+    const v = parseFloat(d.bei) || 0;
+    const pct = v > 0 ? getMonthBeiPct(v) : null;
+    const status = v > 0 ? getMonthBeiStatus(v) : null;
+    const el = document.createElement('div');
+    el.style.cssText = `background:${v > 0 ? (status.color+'18') : 'var(--surface2)'};border:1px solid ${v > 0 ? status.color+'44' : 'var(--border)'};border-radius:8px;padding:8px;text-align:center;cursor:pointer;`;
+    el.title = 'Kliknúť pre detail';
+    el.onclick = () => showMonthView(i);
+    el.innerHTML = `
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px">${MONTHS_SHORT[i]}</div>
+      <div style="font-size:16px;font-weight:700;color:${v > 0 ? status.color : '#334155'}">${pct !== null ? pct + '%' : '—'}</div>
+      <div style="font-size:9px;color:${v > 0 ? status.color : 'var(--text3)'};margin-top:2px">${v > 0 ? status.label : 'nezadané'}</div>
+    `;
+    grid.appendChild(el);
+  });
+}
+
+function updateMainChart() {
+  const kpiData = monthData.map((_, i) => getMonthKpiReward(i));
+  const beiData = monthData.map((_, i) => getMonthBeiReward(i));
+
+  if (!mainChart) {
+    const ctx = document.getElementById('mainChart');
+    if (!ctx) return;
+    mainChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: MONTHS_SHORT,
+        datasets: [
+          { label: 'KPI odmena', data: kpiData, backgroundColor: '#3b82f6', borderRadius: 5, borderSkipped: false },
+          { label: 'BEI odmena', data: beiData, backgroundColor: '#10b981', borderRadius: 5, borderSkipped: false }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { stacked: true, grid: { display: false, drawBorder: false }, ticks: { color: '#64748b', font: { size: 11 } } },
+          y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+            ticks: { color: '#64748b', font: { size: 11 }, callback: v => (v/1000).toFixed(0) + 'k €' } }
+        }
+      }
+    });
+  } else {
+    mainChart.data.datasets[0].data = kpiData;
+    mainChart.data.datasets[1].data = beiData;
+    mainChart.update();
+  }
+}
+
+function updateKpiOverview() {
+  const grid = document.getElementById('kpi-overview-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  KPI_DEFS.forEach(kpi => {
+    let totalRew = 0, metCount = 0;
+    const saved = monthData.filter(d => d.saved).length;
+    monthData.forEach((d, i) => {
+      if (!d.saved) return;
+      const v = d.kpi[kpi.id] || {};
+      const val = kpi.type === 'bool' ? v.met : v.result;
+      const rew = getKpiRewardForValue(kpi, val);
+      if (rew > 0) metCount++;
+      totalRew += rew;
+    });
+    const pct = saved > 0 ? Math.round(metCount/saved*100) : 0;
+    const avgRew = saved > 0 ? Math.round(totalRew/saved) : 0;
+    const maxRew = getKpiTopReward(kpi);
+    const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : pct === 0 && saved === 0 ? '#334155' : '#ef4444';
+
+    const el = document.createElement('div');
+    el.style.cssText = 'background:var(--surface2);border-radius:var(--radius-sm);padding:12px;';
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px;line-height:1.3">${kpi.label}</div>
+      <div style="font-size:20px;font-weight:700;color:${color}">${saved>0?pct+'%':'—'}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px">${metCount}/${saved} mes. · ∅${avgRew>0?avgRew.toLocaleString('sk')+'€':'—'}</div>
+      <div style="font-size:10px;color:var(--text3)">max ${maxRew.toLocaleString('sk')} €</div>
+    `;
+    grid.appendChild(el);
+  });
+}
+
+function renderBeiChart() {
+  const ctx = document.getElementById('beiChart');
+  if (!ctx || beiChart) return;
+  const points = [
+    {x:800000,y:0},{x:922378,y:7298},{x:1011085,y:8000},
+    {x:1152972,y:9000},{x:1210621,y:9900},{x:1268269,y:10800},{x:1325918,y:11700}
+  ];
+  beiChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Odmena',
+        data: points,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.1)',
+        fill: true,
+        tension: 0.1,
+        pointBackgroundColor: '#3b82f6',
+        pointRadius: 5
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { type:'linear', grid: { color:'rgba(255,255,255,0.05)' }, ticks: { color:'#64748b', font:{size:10}, callback: v => (v/1000).toFixed(0)+'k' } },
+        y: { grid: { color:'rgba(255,255,255,0.05)' }, ticks: { color:'#64748b', font:{size:10}, callback: v => (v/1000).toFixed(1)+'k €' } }
+      }
+    }
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── Init ──
+updateSidebarDots();
+updateDashboard();
+renderTimestamp(loadLastSaved());
+
+// ── Service Worker ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+// ── iOS install banner ──
+(function() {
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone;
+  const dismissed = sessionStorage.getItem('ios_banner_dismissed');
+  if (isIos && !isStandalone && !dismissed) {
+    const banner = document.createElement('div');
+    banner.style.cssText = [
+      'position:fixed',
+      'bottom:calc(68px + env(safe-area-inset-bottom))',
+      'left:50%',
+      'transform:translateX(-50%)',
+      'background:#1e293b',
+      'border:1px solid rgba(59,130,246,0.5)',
+      'border-radius:14px',
+      'padding:12px 16px',
+      'font-size:12px',
+      'color:#94a3b8',
+      'line-height:1.5',
+      'z-index:9998',
+      'max-width:320px',
+      'width:calc(100% - 32px)',
+      'box-shadow:0 8px 32px rgba(0,0,0,0.5)'
+    ].join(';');
+    banner.innerHTML = '<button onclick="this.parentElement.remove();sessionStorage.setItem(\'ios_banner_dismissed\',\'1\')" style="position:absolute;top:8px;right:12px;background:none;border:none;color:#64748b;font-size:16px;cursor:pointer;">\u2715</button><strong style="color:#f1f5f9">\uD83D\uDCF2 Prida\u0165 na plochu</strong><br>Kliknite <strong style="color:#3b82f6">Zdiela\u0165</strong> \u2192 <strong style="color:#3b82f6">Prida\u0165 na plochu</strong> pre r\xfdchly pr\xedstup.';
+    document.body.appendChild(banner);
+  }
+})();
+</script>
+</body>
+</html>
